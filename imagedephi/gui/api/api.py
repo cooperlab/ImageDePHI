@@ -8,11 +8,11 @@ import urllib.parse
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 
-from imagedephi.gui.utils.directory import DirectoryData
 from imagedephi.redact import redact_images, show_redaction_plan
 from imagedephi.rules import FileFormat
 from imagedephi.utils.constants import MAX_ASSOCIATED_IMAGE_SIZE
 from imagedephi.utils.dicom import file_is_same_series_as
+from imagedephi.utils.directory import iter_image_dirs
 from imagedephi.utils.image import (
     get_file_format_from_path,
     get_image_response_dicom,
@@ -26,6 +26,41 @@ if TYPE_CHECKING:
     from tifftools.tifftools import IFD
 
 router = APIRouter()
+
+
+def _iter_yaml_files(directory: Path):
+    for child in directory.iterdir():
+        if child.is_file() and child.suffix == ".yaml":
+            yield child
+
+
+class DirectoryData:
+    directory: Path
+    ancestors: list[dict[str, str | Path]]
+    child_directories: list[dict[str, str | Path]]
+    child_images: list[dict[str, str | Path]]
+    child_yaml_files: list[dict[str, str | Path]]
+
+    def __init__(self, directory: Path):
+        self.directory = directory
+
+        self.ancestors = [
+            {"name": ancestor.name, "path": ancestor} for ancestor in reversed(directory.parents)
+        ]
+        self.ancestors.append({"name": directory.name, "path": directory})
+
+        self.child_directories = [
+            {"name": child.name, "path": child}
+            for child in directory.iterdir()
+            if child.is_dir() and os.access(child, os.R_OK)
+        ]
+
+        self.child_images = [
+            {"name": image.name, "path": image} for image in list(iter_image_dirs([directory]))
+        ]
+        self.child_yaml_files = [
+            {"name": yaml_file.name, "path": yaml_file} for yaml_file in _iter_yaml_files(directory)
+        ]
 
 
 @router.get("/directory/")

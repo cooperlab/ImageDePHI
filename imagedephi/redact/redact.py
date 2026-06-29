@@ -18,9 +18,12 @@ from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 import yaml
 
-from imagedephi.gui.api.api import get_associated_image
 from imagedephi.rules import Ruleset
-from imagedephi.utils.constants import MAX_ASSOCIATED_IMAGE_SIZE
+from imagedephi.utils.constants import (
+    IMAGE_DEPHI_MAX_IMAGE_PIXELS,
+    MAX_ASSOCIATED_IMAGE_SIZE,
+)
+from imagedephi.utils.directory import iter_image_dirs
 from imagedephi.utils.image import (
     get_file_format_from_path,
     get_image_response_dicom,
@@ -40,7 +43,6 @@ from PIL import Image
 if TYPE_CHECKING:
     from .redaction_plan import TagRedactionPlan
 
-IMAGE_DEPHI_MAX_IMAGE_PIXELS = 1000000000
 MAX_ASSOCIATED_OUTPUT_SIZE = 500
 
 tags_used: OrderedDict[str, dict[str, Any]] = OrderedDict()
@@ -89,18 +91,6 @@ def get_base_rules(profile: str = "") -> Ruleset:
     with base_rules_path.open() as base_rules_stream:
         base_rule_set = Ruleset.parse_obj(yaml.safe_load(base_rules_stream))
         return base_rule_set
-
-
-def iter_image_dirs(paths: list[Path], recursive: bool = False) -> Generator[Path, None, None]:
-    for path in paths:
-        if path.is_file():
-            yield from iter_image_files(path)
-        elif path.is_dir() and recursive:
-            yield from iter_image_dirs(sorted(path.iterdir()), recursive)
-        elif path.is_dir() and not recursive:
-            for child in path.iterdir():
-                if child.is_file():
-                    yield from iter_image_files(child)
 
 
 def iter_image_files(path: Path) -> Generator[Path, None, None]:
