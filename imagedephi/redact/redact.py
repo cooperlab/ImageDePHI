@@ -6,6 +6,7 @@ from csv import DictWriter
 import datetime
 from enum import Enum
 import importlib.resources
+from io import BytesIO
 import logging
 from pathlib import Path
 from shutil import copy2
@@ -17,6 +18,9 @@ from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 import yaml
 
+from imagedephi.gui.utils.constants import MAX_ASSOCIATED_IMAGE_SIZE
+from imagedephi.gui.api.api import get_associated_image
+
 from imagedephi.rules import Ruleset
 from imagedephi.utils.image import get_file_format_from_path
 from imagedephi.utils.logger import logger
@@ -25,6 +29,8 @@ from imagedephi.utils.progress_log import push_progress
 from .build_redaction_plan import build_redaction_plan
 from .svs import MalformedAperioFileError
 from .tiff import UnsupportedFileTypeError
+
+from PIL import Image
 
 if TYPE_CHECKING:
     from .redaction_plan import TagRedactionPlan
@@ -109,25 +115,84 @@ def generator_to_list_with_progress(
     return result
 
 
-def create_redact_dir_and_manifest(base_output_dir: Path, time_stamp: str) -> tuple[Path, Path]:
+def create_output_dir(name: str, base_output_dir: Path, time_stamp: str) -> Path:
     """
-    Given a directory, create and return a sub-directory within it.
-
-    `identifier` should be a unique string for the new directory. If no value
-    is supplied, a timestamp is used.
+    Create an output directory to store redacted, failes, or associated images
     """
-    redact_dir = base_output_dir / f"Redacted_{time_stamp}"
-    manifest_file = base_output_dir / f"Redacted_{time_stamp}_manifest.csv"
+    output_dir = base_output_dir / f"{name}_{time_stamp}"
 
     try:
-        redact_dir.mkdir(parents=True)
-        manifest_file.touch()
+        output_dir.mkdir(parents=True)
     except PermissionError:
-        logger.error("Cannnot create an output directory, permission error.")
+        logger.error(f"Cannnot create output directory \"{name}\", permission error.")
         raise
     else:
-        logger.info(f"Created redaction folder: {redact_dir}")
-        return redact_dir, manifest_file
+        logger.info(f"Created folder: {output_dir}")
+        return output_dir
+
+
+def create_manifest(base_output_dir: Path, time_stamp: str) -> Path:
+    """
+    Create a manifest file in the specified directory.
+    """
+    manifest_file = base_output_dir / f"Redacted_{time_stamp}_manifest.csv"
+    try:
+        manifest_file.touch()
+    except PermissionError:
+        logger.error("Cannnot create manifest file, permission error.")
+        raise 
+    else:
+        logger.info(f"Created redaction manifest file: {manifest_file}")
+        return manifest_file
+
+
+def missing_image(
+    text: str = "missing",
+    size: tuple[int, int] = (300,300), 
+    background: tuple[int, int, int] = (0, 0, 0),
+    foreground: tuple[int, int, int] = (255, 255, 255),
+    fontsize: int = 40,
+    ) -> Image:
+    """
+    Generates a blank (black) image with white "missing" text as a placeholder
+    when associated images are requested but fail to extract
+    """
+    img = Image.new("RGB", size, color=background)
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.load_default(fontsize)
+    draw.text((size[0] // 2, size[1]//2), text, anchor="mm", font=font, fill=foreground)
+    jpeg_buffer = BytesIO()
+    img.save(jpeg_buffer, "JPEG")
+    jpeg_buffer.seek(0)
+    return jpeg_buffer
+
+
+def get_associated_images_safe(
+    file_name: str = "",
+    svs_images: list[str] = ["label", "macro", "thumbnail"],
+    dicom_images: list[str] = ["label", "overview"],
+    max_height=MAX_ASSOCIATED_IMAGE_SIZE,
+    max_width=MAX_ASSOCIATED_IMAGE_SIZE,
+):
+    """
+    Generates a keyed dictionary of encoded JPEGs from the associated images contained 
+    in `file_name`, substituting an image of 'missing' text when image extraction 
+    fails.
+    """
+    image_type = get_file_format_from_path(Path(file_name))
+    if image_type == FileFormat.SVS:
+        keys = svs_images
+    elif image_type == FileFormat.DICOM:
+        keys = dicom_images
+    else:
+        keys = {}
+    associated = {}
+    for k in keys:
+        try:
+            associated[k] = get_associated_image(file_name, image_key)
+        except:
+            associated[k] = missing_image()
+    return associated
 
 
 def redact_images(
@@ -138,6 +203,7 @@ def redact_images(
     profile: str = "",
     overwrite: bool = False,
     recursive: bool = False,
+    associated: bool = False,
     index: int = 1,
 ) -> None:
 
@@ -168,7 +234,8 @@ def redact_images(
     failed_images: dict[
         str, list[dict[str, dict[str, int | str | list[str] | TagRedactionPlan]]]
     ] = {"failed_images": []}
-    redact_dir, manifest_file = create_redact_dir_and_manifest(output_dir, time_stamp)
+    redact_dir = create_output_dir("Redacted", output_dir, time_stamp)
+    manifest_file = create_manifest(output_dir, time_stamp)
     failed_dir = output_dir / f"Failed_{time_stamp}"
     failed_manifest_file = (
         output_dir / f"Failed_{time_stamp}" / f"Failed_{time_stamp}_manifest.yaml"
@@ -249,6 +316,7 @@ def redact_images(
                 )
 
             else:
+                associated_jpegs = get_associated_images_safe(image_file) if associated else {} # extract associated images prior to redaction
                 redaction_plan.execute_plan()
                 output_parent_dir = redact_dir
                 if recursive:
@@ -258,7 +326,6 @@ def redact_images(
                         if ancestor in input_paths:
                             parent_index = input_paths.index(ancestor)
                             break
-
                     output_parent_dir = Path(
                         str(image_file).replace(str(input_paths[parent_index]), str(redact_dir), 1)
                     ).parent
@@ -282,6 +349,15 @@ def redact_images(
                         "detail": "redacted successfully",
                     }
                 )
+                for image, jpeg in associated_jpegs.items(): # write associated images to disk
+                    associated_parent_dir = Path(
+                        str(output_path).replace(
+                            str(redact_dir), str(redact_dir / "associated" / image), 1
+                        )
+                    ).parent
+                    associated_parent_dir.mkdir(parents=True, exist_ok=True)
+                    associated_path = associated_parent_dir / f"{output_path.name}.{image}.jpg"
+                    associated_path.write_bytes(jpeg.getbuffer())
                 if output_file_counter == output_file_max:
                     logger.info("Redactions completed")
                     if failed_img_counter:
