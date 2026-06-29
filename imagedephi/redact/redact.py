@@ -113,35 +113,25 @@ def generator_to_list_with_progress(
     return result
 
 
-def create_output_dir(name: str, base_output_dir: Path, time_stamp: str) -> Path:
+def create_redact_dir_and_manifest(base_output_dir: Path, time_stamp: str) -> tuple[Path, Path]:
     """
-    Create an output directory to store redacted, failes, or associated images
-    """
-    output_dir = base_output_dir / f"{name}_{time_stamp}"
+    Given a directory, create and return a sub-directory within it.
 
-    try:
-        output_dir.mkdir(parents=True)
-    except PermissionError:
-        logger.error(f"Cannnot create output directory \"{name}\", permission error.")
-        raise
-    else:
-        logger.info(f"Created folder: {output_dir}")
-        return output_dir
-
-
-def create_manifest(base_output_dir: Path, time_stamp: str) -> Path:
+    `identifier` should be a unique string for the new directory. If no value
+    is supplied, a timestamp is used.
     """
-    Create a manifest file in the specified directory.
-    """
+    redact_dir = base_output_dir / f"Redacted_{time_stamp}"
     manifest_file = base_output_dir / f"Redacted_{time_stamp}_manifest.csv"
+
     try:
+        redact_dir.mkdir(parents=True)
         manifest_file.touch()
     except PermissionError:
-        logger.error("Cannnot create manifest file, permission error.")
-        raise 
+        logger.error("Cannnot create an output directory, permission error.")
+        raise
     else:
-        logger.info(f"Created redaction manifest file: {manifest_file}")
-        return manifest_file
+        logger.info(f"Created redaction folder: {redact_dir}")
+        return redact_dir, manifest_file
 
 
 def missing_image(
@@ -259,8 +249,7 @@ def redact_images(
     failed_images: dict[
         str, list[dict[str, dict[str, int | str | list[str] | TagRedactionPlan]]]
     ] = {"failed_images": []}
-    redact_dir = create_output_dir("Redacted", output_dir, time_stamp)
-    manifest_file = create_manifest(output_dir, time_stamp)
+    redact_dir, manifest_file = create_redact_dir_and_manifest(output_dir, time_stamp)
     failed_dir = output_dir / f"Failed_{time_stamp}"
     failed_manifest_file = (
         output_dir / f"Failed_{time_stamp}" / f"Failed_{time_stamp}_manifest.yaml"
