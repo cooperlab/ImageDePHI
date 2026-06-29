@@ -8,17 +8,17 @@ import urllib.parse
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 
-from imagedephi.gui.utils.constants import MAX_ASSOCIATED_IMAGE_SIZE
 from imagedephi.gui.utils.directory import DirectoryData
-from imagedephi.gui.utils.image import (
+from imagedephi.redact import redact_images, show_redaction_plan
+from imagedephi.rules import FileFormat
+from imagedephi.utils.constants import MAX_ASSOCIATED_IMAGE_SIZE
+from imagedephi.utils.dicom import file_is_same_series_as
+from imagedephi.utils.image import (
+    get_file_format_from_path,
     get_image_response_dicom,
     get_image_response_from_ifd,
     get_image_response_from_tiff,
 )
-from imagedephi.redact import redact_images, show_redaction_plan
-from imagedephi.rules import FileFormat
-from imagedephi.utils.dicom import file_is_same_series_as
-from imagedephi.utils.image import get_file_format_from_path
 from imagedephi.utils.progress_log import get_next_progress_message
 from imagedephi.utils.tiff import get_associated_image_svs, get_ifd_for_thumbnail, get_is_svs
 
@@ -77,7 +77,8 @@ def get_associated_image(
                 try:
                     # If the image is not tiled, no appropriate IFD was found. In this case
                     # attempt to get a thumbnail using the entire image.
-                    return get_image_response_from_tiff(file_name, max_width, max_height)
+                    jpeg_buffer = get_image_response_from_tiff(file_name, max_width, max_height)
+                    return StreamingResponse(jpeg_buffer, media_type="image/jpeg")
                 except Exception as e:
                     raise HTTPException(
                         status_code=422,  # unprocessable content
@@ -85,7 +86,8 @@ def get_associated_image(
                     )
             else:
                 try:
-                    return get_image_response_from_ifd(ifd, file_name, max_width, max_height)
+                    jpeg_buffer = get_image_response_from_ifd(ifd, file_name, max_width, max_height)
+                    return StreamingResponse(jpeg_buffer, media_type="image/jpeg")
                 except Exception as e:
                     raise HTTPException(
                         status_code=422,  # unprocessable content
@@ -119,7 +121,7 @@ def get_associated_image(
         ]
         image_response = get_image_response_dicom(related_files, image_key, max_width, max_height)
         if image_response:
-            return image_response
+            return StreamingResponse(image_response, media_type="image/jpeg")
         raise HTTPException(
             status_code=404, detail=f"Could not retrieve {image_key} image for {file_name}"
         )

@@ -18,13 +18,18 @@ from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 import yaml
 
-from imagedephi.gui.utils.constants import MAX_ASSOCIATED_IMAGE_SIZE
 from imagedephi.gui.api.api import get_associated_image
-
 from imagedephi.rules import Ruleset
-from imagedephi.utils.image import get_file_format_from_path
+from imagedephi.utils.constants import MAX_ASSOCIATED_IMAGE_SIZE
+from imagedephi.utils.image import (
+    get_file_format_from_path,
+    get_image_response_dicom,
+    get_image_response_from_ifd,
+    get_image_response_from_tiff,
+)
 from imagedephi.utils.logger import logger
 from imagedephi.utils.progress_log import push_progress
+from imagedephi.utils.tiff import get_associated_image_svs, get_ifd_for_thumbnail, get_is_svs
 
 from .build_redaction_plan import build_redaction_plan
 from .svs import MalformedAperioFileError
@@ -34,6 +39,9 @@ from PIL import Image
 
 if TYPE_CHECKING:
     from .redaction_plan import TagRedactionPlan
+
+IMAGE_DEPHI_MAX_IMAGE_PIXELS = 1000000000
+MAX_ASSOCIATED_OUTPUT_SIZE = 500
 
 tags_used: OrderedDict[str, dict[str, Any]] = OrderedDict()
 redaction_plan_report: Dict[str, Dict[str, Any]] = {}
@@ -167,32 +175,59 @@ def missing_image(
     return jpeg_buffer
 
 
-def get_associated_images_safe(
+def get_associated_outputs(
     file_name: str = "",
     svs_images: list[str] = ["label", "macro", "thumbnail"],
     dicom_images: list[str] = ["label", "overview"],
-    max_height=MAX_ASSOCIATED_IMAGE_SIZE,
-    max_width=MAX_ASSOCIATED_IMAGE_SIZE,
+    max_height=MAX_ASSOCIATED_OUTPUT_SIZE,
+    max_width=MAX_ASSOCIATED_OUTPUT_SIZE,
 ):
     """
     Generates a keyed dictionary of encoded JPEGs from the associated images contained 
     in `file_name`, substituting an image of 'missing' text when image extraction 
     fails.
     """
+
     image_type = get_file_format_from_path(Path(file_name))
-    if image_type == FileFormat.SVS:
-        keys = svs_images
-    elif image_type == FileFormat.DICOM:
-        keys = dicom_images
-    else:
-        keys = {}
-    associated = {}
-    for k in keys:
+    if image_type == FileFormat.SVS or image_type == FileFormat.TIFF:
+        ifd = get_associated_image_svs(Path(file_name), "label")
         try:
-            associated[k] = get_associated_image(file_name, image_key)
-        except:
-            associated[k] = missing_image()
-    return associated
+            label = get_image_response_from_ifd(ifd, file_name, max_height, max_width)
+        except Exception as e:
+            label = missing_image()
+        ifd = get_ifd_for_thumbnail(Path(file_name), int(max_width), int(max_height))
+        if not ifd:
+            try:
+                thumbnail = get_image_response_from_tiff(file_name, max_width, max_height)
+            except:
+                thumbnail = missing_image()
+        else:
+            try:
+                thumbnail = get_image_response_from_ifd(ifd, file_name, max_width, max_height)
+            except:
+                thumbnail = missing_image()
+        ifd = get_associated_image_svs(Path(file_name), "macro")
+        try:
+            macro = get_image_response_from_ifd(ifd, file_name, max_height, max_width)
+        except Exception as e:
+            macro = missing_image()
+        return dict(label=label, thumbnail=thumbnail, macro=macro)
+    elif image_type == FileFormat.DICOM:
+        path = Path(file_name)
+        related_files = [
+            child
+            for child in path.parent.iterdir()
+            if child != path and file_is_same_series_as(path, child)
+        ]
+        try:
+            label = get_image_response_dicom(related_files, "label", max_width, max_height)
+        except Exception as e:
+            label = missing_image()
+        try:
+            overview = get_image_response_dicom(related_files, "overview", max_width, max_height)
+        except Exception as e:
+            overview = missing_image()
+        return dict(label=label, thumbnail=overview)
 
 
 def redact_images(
@@ -316,7 +351,7 @@ def redact_images(
                 )
 
             else:
-                associated_jpegs = get_associated_images_safe(image_file) if associated else {} # extract associated images prior to redaction
+                associated_jpegs = get_associated_outputs(image_file) if associated else {}
                 redaction_plan.execute_plan()
                 output_parent_dir = redact_dir
                 if recursive:
