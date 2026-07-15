@@ -2,6 +2,17 @@ from collections.abc import Generator
 from pathlib import Path
 
 
+def iter_image_files(path: Path) -> Generator[Path, None, None]:
+    file_format = None
+    try:
+        file_format = get_file_format_from_path(path)
+    except PermissionError:
+        # Don't attempt to redact inaccessible files
+        pass
+    if file_format:
+        yield path
+
+
 def iter_image_dirs(paths: list[Path], recursive: bool = False) -> Generator[Path, None, None]:
     for path in paths:
         if path.is_file():
