@@ -26,9 +26,9 @@ from imagedephi.utils.constants import (
 from imagedephi.utils.directory import iter_image_dirs
 from imagedephi.utils.image import (
     get_file_format_from_path,
-    get_image_response_dicom,
-    get_image_response_from_ifd,
-    get_image_response_from_tiff,
+    get_image_bytes_from_dicom,
+    get_image_bytes_from_ifd,
+    get_image_bytes_from_tiff,
 )
 from imagedephi.utils.logger import logger
 from imagedephi.utils.progress_log import push_progress
@@ -140,7 +140,7 @@ def missing_image(
     background: tuple[int, int, int] = (0, 0, 0),
     foreground: tuple[int, int, int] = (255, 255, 255),
     fontsize: int = 40,
-    ) -> Image:
+    ) -> BytesIO:
     """
     Generates a blank (black) image with white "missing" text as a placeholder
     when associated images are requested but fail to extract
@@ -161,34 +161,33 @@ def get_associated_outputs(
     dicom_images: list[str] = ["label", "overview"],
     max_height=MAX_ASSOCIATED_OUTPUT_SIZE,
     max_width=MAX_ASSOCIATED_OUTPUT_SIZE,
-):
+) -> dict[str, BytesIO]:
     """
     Generates a keyed dictionary of encoded JPEGs from the associated images contained 
     in `file_name`, substituting an image of 'missing' text when image extraction 
     fails.
     """
-
     image_type = get_file_format_from_path(Path(file_name))
     if image_type == FileFormat.SVS or image_type == FileFormat.TIFF:
         ifd = get_associated_image_svs(Path(file_name), "label")
         try:
-            label = get_image_response_from_ifd(ifd, file_name, max_height, max_width)
+            label = get_image_bytes_from_ifd(ifd, file_name, max_height, max_width)
         except Exception as e:
             label = missing_image()
         ifd = get_ifd_for_thumbnail(Path(file_name), int(max_width), int(max_height))
         if not ifd:
             try:
-                thumbnail = get_image_response_from_tiff(file_name, max_width, max_height)
+                thumbnail = get_image_bytes_from_tiff(file_name, max_width, max_height)
             except:
                 thumbnail = missing_image()
         else:
             try:
-                thumbnail = get_image_response_from_ifd(ifd, file_name, max_width, max_height)
+                thumbnail = get_image_bytes_from_ifd(ifd, file_name, max_width, max_height)
             except:
                 thumbnail = missing_image()
         ifd = get_associated_image_svs(Path(file_name), "macro")
         try:
-            macro = get_image_response_from_ifd(ifd, file_name, max_height, max_width)
+            macro = get_image_bytes_from_ifd(ifd, file_name, max_height, max_width)
         except Exception as e:
             macro = missing_image()
         return dict(label=label, thumbnail=thumbnail, macro=macro)
@@ -200,11 +199,11 @@ def get_associated_outputs(
             if child != path and file_is_same_series_as(path, child)
         ]
         try:
-            label = get_image_response_dicom(related_files, "label", max_width, max_height)
+            label = get_image_bytes_from_dicom(related_files, "label", max_width, max_height)
         except Exception as e:
             label = missing_image()
         try:
-            overview = get_image_response_dicom(related_files, "overview", max_width, max_height)
+            overview = get_image_bytes_from_dicom(related_files, "overview", max_width, max_height)
         except Exception as e:
             overview = missing_image()
         return dict(label=label, thumbnail=overview)

@@ -99,12 +99,12 @@ def extract_thumbnail_from_image_bytes(
     return resized_image
 
 
-def get_image_response_from_ifd(
+def get_image_bytes_from_ifd(
     ifd: "IFD",
     file_name: str,
     max_width=MAX_ASSOCIATED_IMAGE_SIZE,
     max_height=MAX_ASSOCIATED_IMAGE_SIZE,
-) -> StreamingResponse:
+) -> BytesIO:
     # Make sure the image isn't too big
     height = int(ifd["tags"][tifftools.Tag.ImageLength.value]["data"][0])
     width = int(ifd["tags"][tifftools.Tag.ImageWidth.value]["data"][0])
@@ -134,9 +134,9 @@ def get_image_response_from_ifd(
     return jpeg_buffer
 
 
-def get_image_response_from_tiff(
+def get_image_bytes_from_tiff(
     file_name: str, max_width=MAX_ASSOCIATED_IMAGE_SIZE, max_height=MAX_ASSOCIATED_IMAGE_SIZE
-):
+) -> BytesIO:
     """
     Use as a fallback when we can't find the best IFD for a thumbnail image.
 
@@ -157,12 +157,12 @@ def get_image_response_from_tiff(
     return jpeg_buffer
 
 
-def get_image_response_dicom(
+def get_image_bytes_dicom(
     related_files: list[Path],
     key: str,
     max_width=MAX_ASSOCIATED_IMAGE_SIZE,
     max_height=MAX_ASSOCIATED_IMAGE_SIZE,
-):
+) -> BytesIO:
     slide = WsiDicom.open(related_files)
     image = None
     try:
