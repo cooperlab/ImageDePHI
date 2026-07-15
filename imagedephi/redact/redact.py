@@ -125,7 +125,7 @@ def create_redact_dir_and_manifest(base_output_dir: Path, time_stamp: str) -> tu
 
 
 def missing_image(
-    text: str = "missing",
+    text: list[str] = ["missing"],
     size: tuple[int, int] = (300,300), 
     background: tuple[int, int, int] = (0, 0, 0),
     foreground: tuple[int, int, int] = (255, 255, 255),
@@ -138,7 +138,13 @@ def missing_image(
     img = Image.new("RGB", size, color=background)
     draw = ImageDraw.Draw(img)
     font = ImageFont.load_default(fontsize)
-    draw.text((size[0] // 2, size[1]//2), text, anchor="mm", font=font, fill=foreground)
+    draw.multiline_text(
+        (size[0] // 2, size[1]//2), 
+        "\n".join(text), 
+        anchor="mm", 
+        font=font, 
+        fill=foreground,
+    )
     jpeg_buffer = BytesIO()
     img.save(jpeg_buffer, "JPEG")
     jpeg_buffer.seek(0)
@@ -163,23 +169,23 @@ def get_associated_outputs(
         try:
             label = get_image_bytes_from_ifd(ifd, file_name, max_height, max_width)
         except Exception as e:
-            label = missing_image()
+            label = missing_image(text=["label", "missing"])
         ifd = get_ifd_for_thumbnail(Path(file_name), int(max_width), int(max_height))
         if not ifd:
             try:
                 thumbnail = get_image_bytes_from_tiff(file_name, max_width, max_height)
             except Exception as e:
-                thumbnail = missing_image()
+                thumbnail = missing_image(text=["thumbnail", "missing"])
         else:
             try:
                 thumbnail = get_image_bytes_from_ifd(ifd, file_name, max_width, max_height)
             except Exception as e:
-                thumbnail = missing_image()
+                thumbnail = missing_image(text=["thumbnail", "missing"])
         ifd = get_associated_image_svs(Path(file_name), "macro")
         try:
             macro = get_image_bytes_from_ifd(ifd, file_name, max_height, max_width)
         except Exception as e:
-            macro = missing_image()
+            macro = missing_image(text=["macro", "missing"])
         return dict(label=label, thumbnail=thumbnail, macro=macro)
     elif image_type == FileFormat.DICOM:
         path = Path(file_name)
@@ -191,11 +197,11 @@ def get_associated_outputs(
         try:
             label = get_image_bytes_from_dicom(related_files, "label", max_width, max_height)
         except Exception as e:
-            label = missing_image()
+            label = missing_image(text=["label", "missing"])
         try:
             overview = get_image_bytes_from_dicom(related_files, "overview", max_width, max_height)
         except Exception as e:
-            overview = missing_image()
+            overview = missing_image(text=["overview", "missing"])
         return dict(label=label, thumbnail=overview)
 
 
