@@ -9,6 +9,7 @@ import importlib.resources
 from io import BytesIO
 import logging
 from pathlib import Path
+from PIL import ImageDraw, ImageFont
 from shutil import copy2
 from typing import TYPE_CHECKING, Any, Dict, NamedTuple, TypeVar
 
@@ -18,7 +19,7 @@ from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 import yaml
 
-from imagedephi.rules import Ruleset
+from imagedephi.rules import FileFormat, Ruleset
 from imagedephi.utils.constants import (
     IMAGE_DEPHI_MAX_IMAGE_PIXELS,
     MAX_ASSOCIATED_IMAGE_SIZE,
@@ -91,17 +92,6 @@ def get_base_rules(profile: str = "") -> Ruleset:
     with base_rules_path.open() as base_rules_stream:
         base_rule_set = Ruleset.parse_obj(yaml.safe_load(base_rules_stream))
         return base_rule_set
-
-
-def iter_image_files(path: Path) -> Generator[Path, None, None]:
-    file_format = None
-    try:
-        file_format = get_file_format_from_path(path)
-    except PermissionError:
-        # Don't attempt to redact inaccessible files
-        pass
-    if file_format:
-        yield path
 
 
 def generator_to_list_with_progress(
@@ -178,12 +168,12 @@ def get_associated_outputs(
         if not ifd:
             try:
                 thumbnail = get_image_bytes_from_tiff(file_name, max_width, max_height)
-            except:
+            except Exception as e:
                 thumbnail = missing_image()
         else:
             try:
                 thumbnail = get_image_bytes_from_ifd(ifd, file_name, max_width, max_height)
-            except:
+            except Exception as e:
                 thumbnail = missing_image()
         ifd = get_associated_image_svs(Path(file_name), "macro")
         try:

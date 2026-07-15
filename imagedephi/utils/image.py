@@ -9,7 +9,10 @@ import tifftools
 from wsidicom import WsiDicom
 from wsidicom.errors import WsiDicomNotFoundError
 
-from imagedephi.utils.constants import MAX_ASSOCIATED_IMAGE_SIZE
+from imagedephi.utils.constants import (
+    MAX_ASSOCIATED_IMAGE_SIZE,
+    IMAGE_DEPHI_MAX_IMAGE_PIXELS,
+)
 from imagedephi.rules import FileFormat
 
 if TYPE_CHECKING:

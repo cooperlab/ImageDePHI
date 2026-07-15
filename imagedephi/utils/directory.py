@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from imagedephi.utils.image import get_file_format_from_path
 from pathlib import Path
 
 
