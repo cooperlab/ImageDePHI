@@ -156,7 +156,7 @@ def get_image_bytes_from_tiff(
     return jpeg_buffer
 
 
-def get_image_bytes_dicom(
+def get_image_bytes_from_dicom(
     related_files: list[Path],
     key: str,
     max_width=MAX_ASSOCIATED_IMAGE_SIZE,
