@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Optional
 import urllib.parse
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
 from imagedephi.redact import redact_images, show_redaction_plan
 from imagedephi.rules import FileFormat
@@ -15,9 +15,9 @@ from imagedephi.utils.dicom import file_is_same_series_as
 from imagedephi.utils.directory import iter_image_dirs
 from imagedephi.utils.image import (
     get_file_format_from_path,
-    get_image_response_dicom,
-    get_image_response_from_ifd,
-    get_image_response_from_tiff,
+    get_image_bytes_from_dicom,
+    get_image_bytes_from_ifd,
+    get_image_bytes_from_tiff,
 )
 from imagedephi.utils.progress_log import get_next_progress_message
 from imagedephi.utils.tiff import get_associated_image_svs, get_ifd_for_thumbnail, get_is_svs
@@ -112,7 +112,7 @@ def get_associated_image(
                 try:
                     # If the image is not tiled, no appropriate IFD was found. In this case
                     # attempt to get a thumbnail using the entire image.
-                    jpeg_buffer = get_image_response_from_tiff(file_name, max_width, max_height)
+                    jpeg_buffer = get_image_bytes_from_tiff(file_name, max_width, max_height)
                     return StreamingResponse(jpeg_buffer, media_type="image/jpeg")
                 except Exception as e:
                     raise HTTPException(
@@ -121,7 +121,7 @@ def get_associated_image(
                     )
             else:
                 try:
-                    jpeg_buffer = get_image_response_from_ifd(ifd, file_name, max_width, max_height)
+                    jpeg_buffer = get_image_bytes_from_ifd(ifd, file_name, max_width, max_height)
                     return StreamingResponse(jpeg_buffer, media_type="image/jpeg")
                 except Exception as e:
                     raise HTTPException(
@@ -141,7 +141,7 @@ def get_associated_image(
                 status_code=404, detail=f"No {image_key} image found for {file_name}"
             )
         try:
-            return get_image_response_from_ifd(ifd, file_name, max_height, max_width)
+            return get_image_bytes_from_ifd(ifd, file_name, max_height, max_width)
         except Exception as e:
             raise HTTPException(
                 status_code=422,  # unprocessable content
@@ -154,7 +154,7 @@ def get_associated_image(
             for child in path.parent.iterdir()
             if child != path and file_is_same_series_as(path, child)
         ]
-        image_response = get_image_response_dicom(related_files, image_key, max_width, max_height)
+        image_response = get_image_bytes_from_dicom(related_files, image_key, max_width, max_height)
         if image_response:
             return StreamingResponse(image_response, media_type="image/jpeg")
         raise HTTPException(

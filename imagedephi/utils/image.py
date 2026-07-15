@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PIL import Image, UnidentifiedImageError
-from fastapi.responses import StreamingResponse
 import tifftools
 from wsidicom import WsiDicom
 from wsidicom.errors import WsiDicomNotFoundError
