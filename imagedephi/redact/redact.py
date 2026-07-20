@@ -9,10 +9,10 @@ import importlib.resources
 from io import BytesIO
 import logging
 from pathlib import Path
-from PIL import ImageDraw, ImageFont
 from shutil import copy2
 from typing import TYPE_CHECKING, Any, Dict, NamedTuple, TypeVar
 
+from PIL import Image, ImageDraw, ImageFont
 import tifftools
 import tifftools.constants
 from tqdm import tqdm
@@ -20,6 +20,7 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 import yaml
 
 from imagedephi.rules import FileFormat, Ruleset
+from imagedephi.utils.dicom import file_is_same_series_as
 from imagedephi.utils.directory import iter_image_dirs
 from imagedephi.utils.image import (
     get_file_format_from_path,
@@ -29,14 +30,11 @@ from imagedephi.utils.image import (
 )
 from imagedephi.utils.logger import logger
 from imagedephi.utils.progress_log import push_progress
-from imagedephi.utils.dicom import file_is_same_series_as
 from imagedephi.utils.tiff import get_associated_image_svs, get_ifd_for_thumbnail
 
 from .build_redaction_plan import build_redaction_plan
 from .svs import MalformedAperioFileError
 from .tiff import UnsupportedFileTypeError
-
-from PIL import Image
 
 if TYPE_CHECKING:
     from .redaction_plan import TagRedactionPlan
@@ -122,16 +120,16 @@ def create_redact_dir_and_manifest(base_output_dir: Path, time_stamp: str) -> tu
 
 
 def missing_image(
-    text: list[str] = ["missing"],
+    text: list[str] = None,
     size: tuple[int, int] = (300, 300),
     background: tuple[int, int, int] = (0, 0, 0),
     foreground: tuple[int, int, int] = (255, 255, 255),
     fontsize: int = 40,
 ) -> BytesIO:
     """
-    Generates a blank (black) image with white "missing" text as a placeholder
-    when associated images are requested but fail to extract
+    Returns a black image with white text as a placeholder for missing associated images.
     """
+    text = ["missing"] if text is None else text
     img = Image.new("RGB", size, color=background)
     draw = ImageDraw.Draw(img)
     font = ImageFont.load_default(fontsize)
@@ -150,8 +148,8 @@ def missing_image(
 
 def get_associated_outputs(
     file_name: str = "",
-    svs_images: list[str] = ["label", "macro", "thumbnail"],
-    dicom_images: list[str] = ["label", "overview"],
+    svs_images: list[str] = None,
+    dicom_images: list[str] = None,
     max_height=MAX_ASSOCIATED_OUTPUT_SIZE,
     max_width=MAX_ASSOCIATED_OUTPUT_SIZE,
 ) -> dict[str, BytesIO]:
@@ -162,6 +160,7 @@ def get_associated_outputs(
     """
     image_type = get_file_format_from_path(Path(file_name))
     if image_type == FileFormat.SVS or image_type == FileFormat.TIFF:
+        svs_images = ["label", "macro", "thumbnail"] if svs_images is None else svs_images
         ifd = get_associated_image_svs(Path(file_name), "label")
         try:
             label = get_image_bytes_from_ifd(ifd, file_name, max_height, max_width)
@@ -185,6 +184,7 @@ def get_associated_outputs(
             macro = missing_image(text=["macro", "missing"])
         return dict(label=label, thumbnail=thumbnail, macro=macro)
     elif image_type == FileFormat.DICOM:
+        dicom_images = ["label", "overview"] if dicom_images is None else dicom_images
         path = Path(file_name)
         related_files = [
             child

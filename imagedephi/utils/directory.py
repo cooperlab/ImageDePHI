@@ -1,6 +1,7 @@
 from collections.abc import Generator
-from imagedephi.utils.image import get_file_format_from_path
 from pathlib import Path
+
+from imagedephi.utils.image import get_file_format_from_path
 
 
 def iter_image_files(path: Path) -> Generator[Path, None, None]:
