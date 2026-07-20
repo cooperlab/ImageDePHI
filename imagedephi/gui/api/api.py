@@ -195,6 +195,8 @@ def redact(
     input_directory: str,  # noqa: B008
     output_directory: str,  # noqa: B008
     rules_path: Optional[str] = None,
+    rename: bool = True,
+    export_associated: bool = False,
 ):
     input_path = Path(input_directory)
     output_path = Path(output_directory)
@@ -207,9 +209,20 @@ def redact(
         print("Rules file not found")
     # TODO: Add support for multiple input directories in the UI
     if rules_path:
-        redact_images([input_path], output_path, override_rules=Path(rules_path))
+        redact_images(
+            [input_path], 
+            output_path, 
+            override_rules=Path(rules_path),
+            rename=rename,
+            export_associated=export_associated,
+        )
     else:
-        redact_images([input_path], output_path)
+        redact_images(
+            [input_path],
+            output_path,
+            rename=rename,
+            export_associated=export_associated,            
+        )
 
 
 @router.websocket("/ws")
@@ -237,3 +250,22 @@ async def websocket_endpoint(websocket: WebSocket):
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, 60)
             await websocket.accept()
+
+
+def main():
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from imagedephi.gui.app import app
+    client = TestClient(app)
+    response = client.post(
+        app.url_path_for("redact"),
+        params={
+            "input_directory": "/Users/lac5440/Desktop/test/",
+            "output_directory": "/Users/lac5440/Desktop/deidentified/",
+            "export_associated": True,
+        }
+    )
+    print(response)
+
+if __name__ == "__main__":
+    main()
