@@ -37,8 +37,6 @@ from .svs import MalformedAperioFileError
 from .tiff import UnsupportedFileTypeError
 
 if TYPE_CHECKING:
-    from tifftools.tifftools import IFD
-
     from .redaction_plan import TagRedactionPlan
 
 MAX_ASSOCIATED_OUTPUT_SIZE = 500
@@ -128,9 +126,7 @@ def missing_image(
     foreground: tuple[int, int, int] = (255, 255, 255),
     fontsize: int = 40,
 ) -> BytesIO:
-    """
-    Returns a black image with white text as a placeholder for missing associated images.
-    """
+    """Return a text images as a placeholder for missing associated images."""
     img = Image.new("RGB", size, color=background)
     draw = ImageDraw.Draw(img)
     font = ImageFont.load_default(fontsize)
@@ -152,13 +148,9 @@ def get_associated_outputs(
     max_height=MAX_ASSOCIATED_OUTPUT_SIZE,
     max_width=MAX_ASSOCIATED_OUTPUT_SIZE,
 ) -> dict[str, BytesIO]:
-    """
-    Returns a keyed dictionary of encoded JPEGs from the associated images contained
-    in `file_name`.
-    """
+    """Return encoded JPEGs from the associated images contained in `file_name`."""
     image_type = get_file_format_from_path(Path(file_name))
     if image_type == FileFormat.SVS or image_type == FileFormat.TIFF:
-        ifd: IFD | None = None
         ifd = get_associated_image_svs(Path(file_name), "label")
         try:
             label = get_image_bytes_from_ifd(ifd, file_name, max_height, max_width)
@@ -197,6 +189,7 @@ def get_associated_outputs(
         except Exception:
             overview = missing_image(text=["overview", "missing"])
         return dict(label=label, thumbnail=overview)
+    return dict()
 
 
 def redact_images(

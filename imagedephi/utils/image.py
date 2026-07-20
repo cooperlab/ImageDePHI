@@ -183,5 +183,7 @@ def get_image_bytes_from_dicom(
             image.save(img_buffer, "JPEG")
             img_buffer.seek(0)
             return img_buffer
+        else:
+            raise WsiDicomNotFoundError
     except WsiDicomNotFoundError:
         return img_buffer
