@@ -20,10 +20,6 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 import yaml
 
 from imagedephi.rules import FileFormat, Ruleset
-from imagedephi.utils.constants import (
-    IMAGE_DEPHI_MAX_IMAGE_PIXELS,
-    MAX_ASSOCIATED_IMAGE_SIZE,
-)
 from imagedephi.utils.directory import iter_image_dirs
 from imagedephi.utils.image import (
     get_file_format_from_path,
@@ -33,7 +29,7 @@ from imagedephi.utils.image import (
 )
 from imagedephi.utils.logger import logger
 from imagedephi.utils.progress_log import push_progress
-from imagedephi.utils.tiff import get_associated_image_svs, get_ifd_for_thumbnail, get_is_svs
+from imagedephi.utils.tiff import get_associated_image_svs, get_ifd_for_thumbnail
 
 from .build_redaction_plan import build_redaction_plan
 from .svs import MalformedAperioFileError
@@ -168,23 +164,23 @@ def get_associated_outputs(
         ifd = get_associated_image_svs(Path(file_name), "label")
         try:
             label = get_image_bytes_from_ifd(ifd, file_name, max_height, max_width)
-        except Exception as e:
+        except Exception:
             label = missing_image(text=["label", "missing"])
         ifd = get_ifd_for_thumbnail(Path(file_name), int(max_width), int(max_height))
         if not ifd:
             try:
                 thumbnail = get_image_bytes_from_tiff(file_name, max_width, max_height)
-            except Exception as e:
+            except Exception:
                 thumbnail = missing_image(text=["thumbnail", "missing"])
         else:
             try:
                 thumbnail = get_image_bytes_from_ifd(ifd, file_name, max_width, max_height)
-            except Exception as e:
+            except Exception:
                 thumbnail = missing_image(text=["thumbnail", "missing"])
         ifd = get_associated_image_svs(Path(file_name), "macro")
         try:
             macro = get_image_bytes_from_ifd(ifd, file_name, max_height, max_width)
-        except Exception as e:
+        except Exception:
             macro = missing_image(text=["macro", "missing"])
         return dict(label=label, thumbnail=thumbnail, macro=macro)
     elif image_type == FileFormat.DICOM:
@@ -196,11 +192,11 @@ def get_associated_outputs(
         ]
         try:
             label = get_image_bytes_from_dicom(related_files, "label", max_width, max_height)
-        except Exception as e:
+        except Exception:
             label = missing_image(text=["label", "missing"])
         try:
             overview = get_image_bytes_from_dicom(related_files, "overview", max_width, max_height)
-        except Exception as e:
+        except Exception:
             overview = missing_image(text=["overview", "missing"])
         return dict(label=label, thumbnail=overview)
 

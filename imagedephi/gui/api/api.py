@@ -254,7 +254,6 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 def main():
-    from fastapi import FastAPI
     from fastapi.testclient import TestClient
     from imagedephi.gui.app import app
     client = TestClient(app)
