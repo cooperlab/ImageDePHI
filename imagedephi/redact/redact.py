@@ -37,6 +37,8 @@ from .svs import MalformedAperioFileError
 from .tiff import UnsupportedFileTypeError
 
 if TYPE_CHECKING:
+    from tifftools.tifftools import IFD
+
     from .redaction_plan import TagRedactionPlan
 
 MAX_ASSOCIATED_OUTPUT_SIZE = 500
@@ -120,7 +122,7 @@ def create_redact_dir_and_manifest(base_output_dir: Path, time_stamp: str) -> tu
 
 
 def missing_image(
-    text: list[str] = None,
+    text: list[str],
     size: tuple[int, int] = (300, 300),
     background: tuple[int, int, int] = (0, 0, 0),
     foreground: tuple[int, int, int] = (255, 255, 255),
@@ -129,7 +131,6 @@ def missing_image(
     """
     Returns a black image with white text as a placeholder for missing associated images.
     """
-    text = ["missing"] if text is None else text
     img = Image.new("RGB", size, color=background)
     draw = ImageDraw.Draw(img)
     font = ImageFont.load_default(fontsize)
@@ -148,19 +149,16 @@ def missing_image(
 
 def get_associated_outputs(
     file_name: str = "",
-    svs_images: list[str] = None,
-    dicom_images: list[str] = None,
     max_height=MAX_ASSOCIATED_OUTPUT_SIZE,
     max_width=MAX_ASSOCIATED_OUTPUT_SIZE,
 ) -> dict[str, BytesIO]:
     """
-    Generates a keyed dictionary of encoded JPEGs from the associated images contained
-    in `file_name`, substituting an image of 'missing' text when image extraction
-    fails.
+    Returns a keyed dictionary of encoded JPEGs from the associated images contained
+    in `file_name`.
     """
     image_type = get_file_format_from_path(Path(file_name))
     if image_type == FileFormat.SVS or image_type == FileFormat.TIFF:
-        svs_images = ["label", "macro", "thumbnail"] if svs_images is None else svs_images
+        ifd: IFD | None = None
         ifd = get_associated_image_svs(Path(file_name), "label")
         try:
             label = get_image_bytes_from_ifd(ifd, file_name, max_height, max_width)
@@ -184,7 +182,6 @@ def get_associated_outputs(
             macro = missing_image(text=["macro", "missing"])
         return dict(label=label, thumbnail=thumbnail, macro=macro)
     elif image_type == FileFormat.DICOM:
-        dicom_images = ["label", "overview"] if dicom_images is None else dicom_images
         path = Path(file_name)
         related_files = [
             child
