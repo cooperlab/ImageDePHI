@@ -180,9 +180,7 @@ def imagedephi(
 )
 @click.option("--rename/--skip-rename", default=True)
 @click.option(
-    "-e",
-    "--export-associated",
-    is_flag=True, help="Export label, macro, and thumbnail images."
+    "-e", "--export-associated", is_flag=True, help="Export label, macro, and thumbnail images."
 )
 @click.pass_context
 def run(
@@ -243,7 +241,11 @@ def run(
             )
             cf_profile = str(file_contents.get("profile")) if "profile" in file_contents else ""
             cf_rename = bool(file_contents.get("rename")) if "rename" in file_contents else True
-            cf_export_associated = bool(file_contents.get("export_associated")) if "export_associated" in file_contents else False
+            cf_export_associated = (
+                bool(file_contents.get("export_associated"))
+                if "export_associated" in file_contents
+                else False
+            )
             cf_recursive = (
                 bool(file_contents.get("recursive")) if "recursive" in file_contents else False
             )

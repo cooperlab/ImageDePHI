@@ -29,6 +29,7 @@ from imagedephi.utils.image import (
 )
 from imagedephi.utils.logger import logger
 from imagedephi.utils.progress_log import push_progress
+from imagedephi.utils.dicom import file_is_same_series_as
 from imagedephi.utils.tiff import get_associated_image_svs, get_ifd_for_thumbnail
 
 from .build_redaction_plan import build_redaction_plan
@@ -122,11 +123,11 @@ def create_redact_dir_and_manifest(base_output_dir: Path, time_stamp: str) -> tu
 
 def missing_image(
     text: list[str] = ["missing"],
-    size: tuple[int, int] = (300,300), 
+    size: tuple[int, int] = (300, 300),
     background: tuple[int, int, int] = (0, 0, 0),
     foreground: tuple[int, int, int] = (255, 255, 255),
     fontsize: int = 40,
-    ) -> BytesIO:
+) -> BytesIO:
     """
     Generates a blank (black) image with white "missing" text as a placeholder
     when associated images are requested but fail to extract
@@ -135,10 +136,10 @@ def missing_image(
     draw = ImageDraw.Draw(img)
     font = ImageFont.load_default(fontsize)
     draw.multiline_text(
-        (size[0] // 2, size[1]//2), 
-        "\n".join(text), 
-        anchor="mm", 
-        font=font, 
+        (size[0] // 2, size[1] // 2),
+        "\n".join(text),
+        anchor="mm",
+        font=font,
         fill=foreground,
     )
     jpeg_buffer = BytesIO()
@@ -155,8 +156,8 @@ def get_associated_outputs(
     max_width=MAX_ASSOCIATED_OUTPUT_SIZE,
 ) -> dict[str, BytesIO]:
     """
-    Generates a keyed dictionary of encoded JPEGs from the associated images contained 
-    in `file_name`, substituting an image of 'missing' text when image extraction 
+    Generates a keyed dictionary of encoded JPEGs from the associated images contained
+    in `file_name`, substituting an image of 'missing' text when image extraction
     fails.
     """
     image_type = get_file_format_from_path(Path(file_name))
@@ -354,7 +355,7 @@ def redact_images(
                         "detail": "redacted successfully",
                     }
                 )
-                for image, jpeg in associated_jpegs.items(): # write associated images to disk
+                for image, jpeg in associated_jpegs.items():  # write associated images to disk
                     associated_parent_dir = Path(
                         str(output_path).replace(
                             str(redact_dir), str(redact_dir / "associated" / image), 1
