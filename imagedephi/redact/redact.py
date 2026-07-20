@@ -213,7 +213,7 @@ def redact_images(
     profile: str = "",
     overwrite: bool = False,
     recursive: bool = False,
-    associated: bool = False,
+    export_associated: bool = False,
     index: int = 1,
 ) -> None:
 
@@ -325,7 +325,7 @@ def redact_images(
                 )
 
             else:
-                associated_jpegs = get_associated_outputs(image_file) if associated else {}
+                associated_jpegs = get_associated_outputs(image_file) if export_associated else {}
                 redaction_plan.execute_plan()
                 output_parent_dir = redact_dir
                 if recursive:
