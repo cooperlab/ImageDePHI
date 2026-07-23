@@ -151,10 +151,12 @@ def get_associated_outputs(
     """Return encoded JPEGs from the associated images contained in `file_name`."""
     image_type = get_file_format_from_path(Path(file_name))
     if image_type == FileFormat.SVS or image_type == FileFormat.TIFF:
-        ifd = get_associated_image_svs(Path(file_name), "label")
-        try:
-            label = get_image_bytes_from_ifd(ifd, file_name, max_height, max_width)
-        except Exception:
+        if ifd := get_associated_image_svs(Path(file_name), "label"):
+            try:
+                label = get_image_bytes_from_ifd(ifd, file_name, max_height, max_width)
+            except Exception:
+                label = missing_image(text=["label", "missing"])
+        else:
             label = missing_image(text=["label", "missing"])
         ifd = get_ifd_for_thumbnail(Path(file_name), int(max_width), int(max_height))
         if not ifd:
@@ -167,10 +169,12 @@ def get_associated_outputs(
                 thumbnail = get_image_bytes_from_ifd(ifd, file_name, max_width, max_height)
             except Exception:
                 thumbnail = missing_image(text=["thumbnail", "missing"])
-        ifd = get_associated_image_svs(Path(file_name), "macro")
-        try:
-            macro = get_image_bytes_from_ifd(ifd, file_name, max_height, max_width)
-        except Exception:
+        if ifd := get_associated_image_svs(Path(file_name), "macro"):
+            try:
+                macro = get_image_bytes_from_ifd(ifd, file_name, max_height, max_width)
+            except Exception:
+                macro = missing_image(text=["macro", "missing"])
+        else:
             macro = missing_image(text=["macro", "missing"])
         return dict(label=label, thumbnail=thumbnail, macro=macro)
     elif image_type == FileFormat.DICOM:
