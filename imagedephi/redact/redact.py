@@ -98,7 +98,9 @@ def generator_to_list_with_progress(
     return result
 
 
-def create_redact_dir_and_manifest(base_output_dir: Path, time_stamp: str) -> tuple[Path, Path]:
+def create_redact_dir_and_manifest(
+    base_output_dir: Path, associated: bool, time_stamp: str
+) -> tuple[Path, Path, Path]:
     """
     Given a directory, create and return a sub-directory within it.
 
@@ -106,17 +108,20 @@ def create_redact_dir_and_manifest(base_output_dir: Path, time_stamp: str) -> tu
     is supplied, a timestamp is used.
     """
     redact_dir = base_output_dir / f"Redacted_{time_stamp}"
+    associated_dir = base_output_dir / f"Associated_{time_stamp}"
     manifest_file = base_output_dir / f"Redacted_{time_stamp}_manifest.csv"
 
     try:
         redact_dir.mkdir(parents=True)
+        if associated:
+            associated_dir.mkdir()
         manifest_file.touch()
     except PermissionError:
         logger.error("Cannnot create an output directory, permission error.")
         raise
     else:
         logger.info(f"Created redaction folder: {redact_dir}")
-        return redact_dir, manifest_file
+        return redact_dir, associated_dir, manifest_file
 
 
 def missing_image(
@@ -235,7 +240,9 @@ def redact_images(
     failed_images: dict[
         str, list[dict[str, dict[str, int | str | list[str] | TagRedactionPlan]]]
     ] = {"failed_images": []}
-    redact_dir, manifest_file = create_redact_dir_and_manifest(output_dir, time_stamp)
+    redact_dir, associated_dir, manifest_file = create_redact_dir_and_manifest(
+        output_dir, export_associated, time_stamp
+    )
     failed_dir = output_dir / f"Failed_{time_stamp}"
     failed_manifest_file = (
         output_dir / f"Failed_{time_stamp}" / f"Failed_{time_stamp}_manifest.yaml"
@@ -351,9 +358,7 @@ def redact_images(
                 )
                 for image, jpeg in associated_jpegs.items():  # write associated images to disk
                     associated_parent_dir = Path(
-                        str(output_path).replace(
-                            str(redact_dir), str(redact_dir / "associated" / image), 1
-                        )
+                        str(output_path).replace(str(redact_dir), str(associated_dir / image), 1)
                     ).parent
                     associated_parent_dir.mkdir(parents=True, exist_ok=True)
                     associated_path = associated_parent_dir / f"{output_path.name}.{image}.jpg"
