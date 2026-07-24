@@ -72,6 +72,7 @@ def test_create_redact_dir_and_manifest(tmp_path):
     assert not associated_dir.exists()
     assert manifest.exists()
     assert manifest.name == "Redacted_2023-05-12_12-12-53_manifest.csv"
+    output_dir.rmdir()
     output_dir, associated_dir, manifest = create_redact_dir_and_manifest(
         tmp_path / "fake", True, time_stamp
     )
