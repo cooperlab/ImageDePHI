@@ -102,7 +102,7 @@ def create_redact_dir_and_manifest(
     base_output_dir: Path, associated: bool, time_stamp: str
 ) -> tuple[Path, Path, Path]:
     """
-    Given a directory, create and return a sub-directory within it.
+    Create output directories and manifest file.
 
     `identifier` should be a unique string for the new directory. If no value
     is supplied, a timestamp is used.
